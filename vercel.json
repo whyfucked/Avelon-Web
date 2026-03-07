@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/status",
+      "schedule": "*/3 * * * *"
+    },
+    {
+      "path": "/api/cron/vmmanager",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/services",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}

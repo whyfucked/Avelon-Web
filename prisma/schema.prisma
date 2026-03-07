@@ -1,0 +1,574 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model AdminSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique(map: "AdminSettings_key_key")
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("AdminSettings")
+}
+
+model Notification {
+  id           String            @id @default(cuid())
+  title        String
+  message      String            @db.Text
+  type         notification_type @default(INFO)
+  showOnHome   Boolean           @default(true)
+  showOnClient Boolean           @default(true)
+  showOnAdmin  Boolean           @default(false)
+  linkText     String?
+  linkUrl      String?
+  dismissible  Boolean           @default(true)
+  isActive     Boolean           @default(true)
+  startsAt     DateTime          @default(now())
+  expiresAt    DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@map("Notification")
+}
+
+model Plan {
+  id             String           @id @default(cuid())
+  name           String
+  slug           String           @unique(map: "Plan_slug_key")
+  description    String?          @db.Text
+  category       plan_category    @default(MINECRAFT)
+  ram            Int
+  cpu            Int
+  disk           Int
+  databases      Int              @default(1)
+  backups        Int              @default(3)
+  allocations    Int              @default(1)
+  price          Float
+  eggId          String?
+  mobIcon        String?
+  customIcon     String?
+  isActive       Boolean          @default(true)
+  sortOrder      Int              @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  isFree         Boolean          @default(false)
+  // VMManager6 preset ID для VDS планов
+  vmPresetId     Int?
+  // VMManager6 cluster ID для VDS планов
+  vmClusterId    Int?
+  // VMManager6 IP pool ID для VDS планов
+  vmIpPoolId     Int?
+  // Custom VDS specs (JSON: {cpuModel: string, network: string})
+  vdsCustomSpecs String?      @db.Text
+  // Node selection fields for VDS creation
+  vmNodeId       Int?
+  vmNodeStrategy String?
+  egg            PterodactylEgg?  @relation(fields: [eggId], references: [id], map: "Plan_eggId_fkey")
+  eggOptions     PlanEggOption[]
+  servers        Server[]
+  vdsServers     VdsServer[]
+  dedicatedServers DedicatedServer[]
+  domains        Domain[]
+  storageBoxes   StorageBox[]
+
+  @@index([eggId], map: "Plan_eggId_fkey")
+  @@map("Plan")
+}
+
+model PlanEggOption {
+  id     String         @id @default(cuid())
+  planId String
+  eggId  String
+  egg    PterodactylEgg @relation(fields: [eggId], references: [id], onDelete: Cascade, map: "PlanEggOption_eggId_fkey")
+  plan   Plan           @relation(fields: [planId], references: [id], onDelete: Cascade, map: "PlanEggOption_planId_fkey")
+
+  @@index([eggId], map: "PlanEggOption_eggId_fkey")
+  @@index([planId], map: "PlanEggOption_planId_fkey")
+  @@map("PlanEggOption")
+}
+
+model PromoCode {
+  id        String         @id @default(cuid())
+  code      String         @unique(map: "PromoCode_code_key")
+  type      promocode_type
+  value     Float
+  maxUses   Int?
+  usedCount Int            @default(0)
+  minAmount Float?
+  expiresAt DateTime?
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  usages    PromoUsage[]
+
+  @@map("PromoCode")
+}
+
+model PromoUsage {
+  id        String    @id @default(cuid())
+  promoId   String
+  userId    String
+  usedAt    DateTime  @default(now())
+  promoCode PromoCode @relation(fields: [promoId], references: [id], onDelete: Cascade, map: "PromoUsage_promoId_fkey")
+
+  @@unique([promoId, userId], map: "PromoUsage_promoId_userId_key")
+  @@map("PromoUsage")
+}
+
+model PterodactylEgg {
+  id             String          @id @default(cuid())
+  pterodactylId  Int             @unique(map: "PterodactylEgg_pterodactylId_key")
+  nestId         Int
+  nestName       String?
+  name           String
+  description    String?         @db.Text
+  dockerImage    String?
+  startup        String?         @db.Text
+  startupPresets String?         @db.Text
+  defaultEnv     String?         @db.Text
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  plans          Plan[]
+  eggOptions     PlanEggOption[]
+  servers        Server[]
+
+  @@map("PterodactylEgg")
+}
+
+model PterodactylNode {
+  id                 String                   @id @default(cuid())
+  pterodactylId      Int                      @unique(map: "PterodactylNode_pterodactylId_key")
+  name               String
+  fqdn               String?
+  locationId         Int
+  locationName       String?
+  countryCode        String?
+  memory             Int?
+  memoryOverallocate Int?
+  disk               Int?
+  diskOverallocate   Int?
+  isActive           Boolean                  @default(true)
+  priceModifier      Float                    @default(0)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  isFree             Boolean                  @default(false)
+  allowCreation      Boolean                  @default(true)
+  nodeType           pterodactylnode_nodeType @default(MINECRAFT)
+  servers            Server[]
+  statuses           ServiceStatus[]
+
+  @@map("PterodactylNode")
+}
+
+model Server {
+  id                    String           @id @default(cuid())
+  name                  String
+  userId                String
+  planId                String
+  pterodactylId         Int?             @unique(map: "Server_pterodactylId_key")
+  pterodactylUuid       String?
+  pterodactylIdentifier String?
+  eggId                 String?
+  nodeId                String?
+  status                server_status    @default(PENDING)
+  expiresAt             DateTime?
+  paidAmount            Float?
+  startupCommand        String?          @db.Text
+  startupPreset         String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  egg                   PterodactylEgg?  @relation(fields: [eggId], references: [id], map: "Server_eggId_fkey")
+  node                  PterodactylNode? @relation(fields: [nodeId], references: [id], map: "Server_nodeId_fkey")
+  plan                  Plan             @relation(fields: [planId], references: [id], map: "Server_planId_fkey")
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Server_userId_fkey")
+
+  @@index([eggId], map: "Server_eggId_fkey")
+  @@index([nodeId], map: "Server_nodeId_fkey")
+  @@index([planId], map: "Server_planId_fkey")
+  @@index([userId], map: "Server_userId_fkey")
+  @@map("Server")
+}
+
+model ServiceStatus {
+  id           String             @id @default(cuid())
+  name         String
+  type         servicestatus_type
+  isSystem     Boolean            @default(false)
+  url          String?
+  nodeId       String?
+  isOnline     Boolean            @default(true)
+  lastCheck    DateTime           @default(now())
+  responseTime Int?
+  sortOrder    Int                @default(0)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  routerIp     String?
+  routerPort   Int?
+  node         PterodactylNode?   @relation(fields: [nodeId], references: [id], map: "ServiceStatus_nodeId_fkey")
+  history      UptimeHistory[]
+
+  @@index([nodeId], map: "ServiceStatus_nodeId_fkey")
+  @@map("ServiceStatus")
+}
+
+model Transaction {
+  id          String             @id @default(cuid())
+  userId      String
+  type        transaction_type
+  amount      Float
+  description String
+  serverId    String?
+  createdAt   DateTime           @default(now())
+  externalId  String?            @unique(map: "Transaction_externalId_key")
+  status      transaction_status @default(COMPLETED)
+  method      transaction_method @default(MANUAL)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Transaction_userId_fkey")
+
+  @@index([userId], map: "Transaction_userId_fkey")
+  @@map("Transaction")
+}
+
+model UptimeHistory {
+  id           String        @id @default(cuid())
+  serviceId    String
+  isOnline     Boolean
+  responseTime Int?
+  checkedAt    DateTime      @default(now())
+  service      ServiceStatus @relation(fields: [serviceId], references: [id], onDelete: Cascade, map: "UptimeHistory_serviceId_fkey")
+
+  @@index([serviceId, checkedAt], map: "UptimeHistory_serviceId_checkedAt_idx")
+  @@map("UptimeHistory")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique(map: "User_email_key")
+  password      String
+  name          String?
+  balance       Float           @default(0)
+  role          user_role       @default(USER)
+  pterodactylId Int?            @unique(map: "User_pterodactylId_key")
+  pterodactylPassword String?   // Зашифрованный пароль для Pterodactyl
+  emailVerified Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  servers       Server[]
+  vdsServers    VdsServer[]
+  dedicatedServers DedicatedServer[]
+  domains       Domain[]
+  storageBoxes  StorageBox[]
+  transactions  Transaction[]
+  passwordReset PasswordReset?
+  emailVerification EmailVerification?
+  userLogs      AdminLog[]      @relation("UserLogs")
+  adminLogs     AdminLog[]      @relation("AdminLogs")
+
+  @@map("User")
+}
+
+model EmailVerification {
+  id            String   @id @default(cuid())
+  userId        String?  @unique
+  email         String?  @unique // Для pending регистраций
+  code          String
+  password      String?  // Хешированный пароль для pending регистраций
+  plainPassword String?  @db.Text // Оригинальный пароль для Pterodactyl
+  name          String?  // Имя для pending регистраций
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("EmailVerification")
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("PasswordReset")
+}
+
+enum promocode_type {
+  DISCOUNT
+  BALANCE
+}
+
+enum servicestatus_type {
+  WEB
+  GAME
+  NODE
+  ROUTER
+}
+
+enum transaction_type {
+  DEPOSIT
+  PAYMENT
+  REFUND
+  PROMO
+  VDS_PAYMENT
+  VDS_RENEWAL
+  DEDICATED_PAYMENT
+  DEDICATED_RENEWAL
+  DOMAIN_PAYMENT
+  DOMAIN_RENEWAL
+  STORAGEBOX_PAYMENT
+  STORAGEBOX_RENEWAL
+}
+
+enum notification_type {
+  INFO
+  WARNING
+  SUCCESS
+  ERROR
+  MAINTENANCE
+}
+
+enum plan_category {
+  MINECRAFT
+  CODING
+  VDS
+  DEDICATED
+  DOMAIN
+  STORAGEBOX
+}
+
+enum user_role {
+  USER
+  ADMIN
+}
+
+enum transaction_status {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum server_status {
+  UNPAID
+  PENDING
+  INSTALLING
+  READY
+  ACTIVE
+  SUSPENDED
+  GRACE_PERIOD
+  OFF
+  RESTARTING
+  DELETED
+}
+
+enum transaction_method {
+  MANUAL
+  CRYSTALPAY
+  YOOMONEY
+  HELEKET
+  PAYPALYCH
+}
+
+enum pterodactylnode_nodeType {
+  MINECRAFT
+  CODING
+}
+
+enum vds_server_status {
+  UNPAID
+  PENDING
+  INSTALLING
+  READY
+  ACTIVE
+  SUSPENDED
+  GRACE_PERIOD
+  OFF
+  RESTARTING
+  DELETED
+}
+
+enum admin_log_action {
+  USER_LOGIN
+  USER_LOGOUT
+  USER_REGISTER
+  BALANCE_ADD
+  BALANCE_SUBTRACT
+  SERVER_CREATE
+  SERVER_DELETE
+  SERVER_SUSPEND
+  SERVER_UNSUSPEND
+  VDS_CREATE
+  VDS_DELETE
+  VDS_SUSPEND
+  VDS_UNSUSPEND
+  DEDICATED_CREATE
+  DEDICATED_DELETE
+  DEDICATED_SUSPEND
+  DEDICATED_UNSUSPEND
+  DOMAIN_CREATE
+  DOMAIN_DELETE
+  DOMAIN_SUSPEND
+  DOMAIN_UNSUSPEND
+  STORAGEBOX_CREATE
+  STORAGEBOX_DELETE
+  STORAGEBOX_SUSPEND
+  STORAGEBOX_UNSUSPEND
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
+  SETTINGS_UPDATE
+  PLAN_CREATE
+  PLAN_UPDATE
+  PLAN_DELETE
+  USER_UPDATE
+  USER_DELETE
+}
+
+model VdsOsImage {
+  id          String   @id @default(cuid())
+  vmManagerId Int      @unique
+  name        String
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("VdsOsImage")
+}
+
+model VdsCluster {
+  id          String   @id @default(cuid())
+  vmManagerId Int      @unique
+  name        String
+  countryCode String?
+  ipPoolIds   String?  @db.Text // JSON array of IP pool IDs connected to this cluster
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("VdsCluster")
+}
+
+model VdsServer {
+  id                String           @id @default(cuid())
+  name              String
+  userId            String
+  planId            String
+  vmManagerId       Int?             @unique
+  vmManagerUuid     String?
+  clusterId         String?
+  osImageId         String?
+  status            vds_server_status @default(PENDING)
+  ipAddress         String?
+  rootPassword      String?
+  expiresAt         DateTime?
+  gracePeriodEnd    DateTime?
+  paidAmount        Float?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  plan              Plan             @relation(fields: [planId], references: [id])
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("VdsServer")
+}
+
+model AdminLog {
+  id          String         @id @default(cuid())
+  userId      String?
+  adminId     String?
+  action      admin_log_action
+  description String         @db.Text
+  ipAddress   String?
+  userAgent   String?        @db.Text
+  metadata    String?        @db.Text // JSON для дополнительных данных
+  createdAt   DateTime       @default(now())
+  user        User?          @relation("UserLogs", fields: [userId], references: [id], onDelete: SetNull)
+  admin       User?          @relation("AdminLogs", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("AdminLog")
+}
+
+model DedicatedServer {
+  id              String           @id @default(cuid())
+  name            String
+  userId          String
+  planId          String?
+  status          server_status    @default(PENDING)
+  ipAddress       String?
+  rootPassword    String?
+  specs           String?          @db.Text // JSON с характеристиками
+  expiresAt       DateTime?
+  gracePeriodEnd  DateTime?        // Дата окончания grace period
+  paidAmount      Float?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  plan            Plan?            @relation(fields: [planId], references: [id])
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("DedicatedServer")
+}
+
+model Domain {
+  id              String           @id @default(cuid())
+  name            String           // Имя домена
+  userId          String
+  planId          String?
+  status          server_status    @default(PENDING)
+  registrar       String?          // Регистратор
+  nameservers     String?          @db.Text // JSON с NS
+  expiresAt       DateTime?
+  gracePeriodEnd  DateTime?
+  paidAmount      Float?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  plan            Plan?            @relation(fields: [planId], references: [id])
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("Domain")
+}
+
+model StorageBox {
+  id              String           @id @default(cuid())
+  name            String
+  userId          String
+  planId          String?
+  status          server_status    @default(PENDING)
+  ftpHost         String?
+  ftpUser         String?
+  ftpPassword     String?
+  sizeGB          Int?
+  expiresAt       DateTime?
+  gracePeriodEnd  DateTime?
+  paidAmount      Float?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  plan            Plan?            @relation(fields: [planId], references: [id])
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("StorageBox")
+}
