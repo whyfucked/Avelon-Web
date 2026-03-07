@@ -14,7 +14,7 @@
 
 - **Language:** TypeScript
 - **Framework:** Next.js
-- **Database:** PostgreSQL (with Prisma ORM)
+- **Database:** MySQL (with Prisma ORM)
 
 ### Development
 
@@ -54,7 +54,7 @@ During development, we utilized AI assistance from **Codex** to help with certai
 
 - **Язык:** TypeScript
 - **Фреймворк:** Next.js
-- **База данных:** PostgreSQL (с Prisma ORM)
+- **База данных:** MySQL (с Prisma ORM)
 
 ### Разработка
 
